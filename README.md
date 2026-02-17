@@ -28,7 +28,7 @@ If a command doesn't materially achieve one of these goals & the bonus goal, it 
 `fxios` is available through brew.
 
 ```bash
-brew tap adudenamedruby/fxios
+brew tap mozilla-mobile/fxios
 brew install fxios
 ```
 
