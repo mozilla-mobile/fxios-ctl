@@ -93,6 +93,38 @@ struct LintTests {
         #expect(command.quiet == true)
     }
 
+    // MARK: - Run swiftlintFlags Tests
+
+    @Test("Run swiftlintFlags returns empty array by default")
+    func runSwiftlintFlagsDefault() throws {
+        let command = try Lint.Run.parse([])
+        #expect(command.swiftlintFlags().isEmpty)
+    }
+
+    @Test("Run swiftlintFlags includes --quiet when quiet is set")
+    func runSwiftlintFlagsQuiet() throws {
+        let command = try Lint.Run.parse(["--quiet"])
+        let flags = command.swiftlintFlags()
+        #expect(flags.contains("--quiet"))
+        #expect(!flags.contains("--strict"))
+    }
+
+    @Test("Run swiftlintFlags includes --strict when strict is set")
+    func runSwiftlintFlagsStrict() throws {
+        let command = try Lint.Run.parse(["--strict"])
+        let flags = command.swiftlintFlags()
+        #expect(flags.contains("--strict"))
+        #expect(!flags.contains("--quiet"))
+    }
+
+    @Test("Run swiftlintFlags includes both flags when both are set")
+    func runSwiftlintFlagsBoth() throws {
+        let command = try Lint.Run.parse(["--strict", "--quiet"])
+        let flags = command.swiftlintFlags()
+        #expect(flags.contains("--strict"))
+        #expect(flags.contains("--quiet"))
+    }
+
     // MARK: - Fix Subcommand Tests
 
     @Test("Fix subcommand has correct name")

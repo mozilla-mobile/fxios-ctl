@@ -45,6 +45,16 @@ extension Lint {
             try runLint(lintAll: lintAll, repoRoot: repo.root)
         }
 
+        // MARK: - Flags
+
+        /// Builds the swiftlint flag arguments based on parsed options.
+        func swiftlintFlags() -> [String] {
+            var flags: [String] = []
+            if strict { flags.append("--strict") }
+            if quiet { flags.append("--quiet") }
+            return flags
+        }
+
         // MARK: - Lint
 
         private func runLint(lintAll: Bool, repoRoot: URL) throws {
@@ -52,7 +62,7 @@ extension Lint {
                 Herald.declare("Linting entire codebase...", isNewCommand: true)
 
                 do {
-                    try ShellRunner.run("swiftlint", arguments: [], workingDirectory: repoRoot)
+                    try ShellRunner.run("swiftlint", arguments: swiftlintFlags(), workingDirectory: repoRoot)
                     Herald.declare("Linting complete!", asConclusion: true)
                 } catch let error as ShellRunnerError {
                     if case .commandFailed(_, let exitCode) = error {
@@ -80,14 +90,7 @@ extension Lint {
                 var hasViolations = false
                 for file in changedFiles {
                     var args: [String] = ["lint", "--config", configPath, "--path", file]
-
-                    if strict {
-                        args.append("--strict")
-                    }
-
-                    if quiet {
-                        args.append("--quiet")
-                    }
+                    args.append(contentsOf: swiftlintFlags())
 
                     do {
                         try ShellRunner.run("swiftlint", arguments: args, workingDirectory: repoRoot)
@@ -116,7 +119,7 @@ extension Lint {
         private func printExposedCommands(lintAll: Bool, repoRoot: URL) {
             if lintAll {
                 Herald.raw("# Lint entire codebase")
-                Herald.raw("swiftlint")
+                Herald.raw(CommandHelpers.formatCommand("swiftlint", arguments: swiftlintFlags()))
             } else {
                 let configPath = repoRoot.appendingPathComponent(".swiftlint.yaml").path
 
@@ -129,14 +132,7 @@ extension Lint {
                 Herald.raw("")
 
                 var args: [String] = ["lint", "--config", configPath, "--path", "<file>"]
-
-                if strict {
-                    args.append("--strict")
-                }
-
-                if quiet {
-                    args.append("--quiet")
-                }
+                args.append(contentsOf: swiftlintFlags())
 
                 Herald.raw("# Lint each changed file")
                 Herald.raw(CommandHelpers.formatCommand("swiftlint", arguments: args))
