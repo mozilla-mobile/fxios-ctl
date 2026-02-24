@@ -156,7 +156,81 @@ struct NimbusTests {
     @Test("Command has subcommands")
     func commandHasSubcommands() {
         let subcommands = Nimbus.configuration.subcommands
-        #expect(subcommands.count == 3)
+        #expect(subcommands.count == 4)
+    }
+
+    // MARK: - List Features Subcommand Tests
+
+    @Test("list-features throws when not in firefox-ios repo")
+    func listFeaturesThrowsWhenNotInRepo() throws {
+        let tempDir = try createTempDirectory()
+        defer { cleanup(tempDir) }
+
+        let originalDir = FileManager.default.currentDirectoryPath
+        FileManager.default.changeCurrentDirectoryPath(tempDir.path)
+        defer { FileManager.default.changeCurrentDirectoryPath(originalDir) }
+
+        var command = try Nimbus.ListFeatures.parse([])
+
+        #expect(throws: RepoDetectorError.self) {
+            try command.run()
+        }
+    }
+
+    @Test("list-features lists flat feature files alphabetically")
+    func listFeaturesListsFlatFiles() throws {
+        let repoDir = try createValidRepo()
+        defer { cleanup(repoDir) }
+        try setupNimbusStructure(in: repoDir)
+
+        let featuresDir = repoDir.appendingPathComponent("firefox-ios/nimbus-features")
+        try "# C".write(to: featuresDir.appendingPathComponent("cFeature.yaml"), atomically: true, encoding: .utf8)
+        try "# A".write(to: featuresDir.appendingPathComponent("aFeature.yaml"), atomically: true, encoding: .utf8)
+        try "# B".write(to: featuresDir.appendingPathComponent("bFeature.yaml"), atomically: true, encoding: .utf8)
+
+        let originalDir = FileManager.default.currentDirectoryPath
+        FileManager.default.changeCurrentDirectoryPath(repoDir.path)
+        defer { FileManager.default.changeCurrentDirectoryPath(originalDir) }
+
+        // Command should run without throwing
+        var command = try Nimbus.ListFeatures.parse([])
+        try command.run()
+    }
+
+    @Test("list-features lists features from subfolders with relative paths")
+    func listFeaturesListsSubfolderFiles() throws {
+        let repoDir = try createValidRepo()
+        defer { cleanup(repoDir) }
+        try setupNimbusStructure(in: repoDir)
+
+        let featuresDir = repoDir.appendingPathComponent("firefox-ios/nimbus-features")
+        // Create a subfolder with a feature
+        let subDir = featuresDir.appendingPathComponent("messaging")
+        try FileManager.default.createDirectory(at: subDir, withIntermediateDirectories: true)
+        try "# Messaging".write(to: subDir.appendingPathComponent("messageFeature.yaml"), atomically: true, encoding: .utf8)
+        // And a top-level feature
+        try "# Top".write(to: featuresDir.appendingPathComponent("topFeature.yaml"), atomically: true, encoding: .utf8)
+
+        let originalDir = FileManager.default.currentDirectoryPath
+        FileManager.default.changeCurrentDirectoryPath(repoDir.path)
+        defer { FileManager.default.changeCurrentDirectoryPath(originalDir) }
+
+        var command = try Nimbus.ListFeatures.parse([])
+        try command.run()
+    }
+
+    @Test("list-features handles empty nimbus-features directory")
+    func listFeaturesHandlesEmptyDirectory() throws {
+        let repoDir = try createValidRepo()
+        defer { cleanup(repoDir) }
+        try setupNimbusStructure(in: repoDir)
+
+        let originalDir = FileManager.default.currentDirectoryPath
+        FileManager.default.changeCurrentDirectoryPath(repoDir.path)
+        defer { FileManager.default.changeCurrentDirectoryPath(originalDir) }
+
+        var command = try Nimbus.ListFeatures.parse([])
+        try command.run()
     }
 
     // MARK: - Refresh Subcommand Tests

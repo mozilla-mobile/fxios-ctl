@@ -11,11 +11,12 @@ struct Nimbus: ParsableCommand {
         discussion: """
             Manages Nimbus feature flags across the firefox-ios codebase.
 
+            Use 'list-features' to list all available features.
             Use 'refresh' to update the include block in nimbus.fml.yaml.
             Use 'add' to create a new feature with all required boilerplate.
             Use 'remove' to remove a feature from all locations.
             """,
-        subcommands: [Refresh.self, Add.self, Remove.self]
+        subcommands: [ListFeatures.self, Refresh.self, Add.self, Remove.self]
     )
 }
 
