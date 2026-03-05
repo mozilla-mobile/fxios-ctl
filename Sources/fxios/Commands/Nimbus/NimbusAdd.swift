@@ -20,8 +20,8 @@ extension Nimbus {
         @Argument(help: "The feature name in camelCase (without 'Feature' suffix).")
         var featureName: String
 
-        @Flag(name: .long, help: "Add the feature to the QA settings UI.")
-        var qa = false
+        @Flag(name: .long, help: "Add the feature to the debuggable settings UI.")
+        var debuggable = false
 
         @Flag(name: .long, help: "Mark the feature as user-toggleable (requires implementing a preference key).")
         var userToggleable = false
@@ -64,7 +64,7 @@ extension Nimbus {
             Herald.declare("Updating NimbusFlaggableFeature.swift...")
             try NimbusFlaggableFeatureEditor.addFeature(
                 name: cleanName,
-                debug: qa,
+                debug: debuggable,
                 userToggleable: userToggleable,
                 filePath: flaggableFeaturePath
             )
@@ -74,8 +74,8 @@ extension Nimbus {
             Herald.declare("Updating NimbusFeatureFlagLayer.swift...")
             try NimbusFeatureFlagLayerEditor.addFeature(name: cleanName, filePath: flagLayerPath)
 
-            // 5. If --qa, update FeatureFlagsDebugViewController.swift
-            if qa {
+            // 5. If --debuggable, update FeatureFlagsDebugViewController.swift
+            if debuggable {
                 let debugVCPath = repo.root.appendingPathComponent(NimbusConstants.featureFlagsDebugViewControllerPath)
                 Herald.declare("Updating FeatureFlagsDebugViewController.swift...")
                 try FeatureFlagsDebugViewControllerEditor.addFeature(name: cleanName, filePath: debugVCPath)
