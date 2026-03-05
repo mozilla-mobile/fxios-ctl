@@ -496,8 +496,8 @@ struct NimbusTests {
         #expect(content.contains("nimbus.features.beta.value().enabled"))
     }
 
-    @Test("add command with --qa updates QA settings")
-    func addCommandWithQaUpdatesQaSettings() throws {
+    @Test("add command with --debuggable updates debuggable settings")
+    func addCommandWithDebuggableUpdatesdebuggableSettings() throws {
         let repoDir = try createValidRepo()
         defer { cleanup(repoDir) }
         try setupNimbusStructure(in: repoDir)
@@ -507,7 +507,7 @@ struct NimbusTests {
         FileManager.default.changeCurrentDirectoryPath(repoDir.path)
         defer { FileManager.default.changeCurrentDirectoryPath(originalDir) }
 
-        var command = try Nimbus.Add.parse(["beta", "--qa"])
+        var command = try Nimbus.Add.parse(["beta", "--debuggable"])
         try command.run()
 
         // Check NimbusFlaggableFeature.swift for debugKey
@@ -698,8 +698,8 @@ struct NimbusTests {
         FileManager.default.changeCurrentDirectoryPath(repoDir.path)
         defer { FileManager.default.changeCurrentDirectoryPath(originalDir) }
 
-        // First add a feature with --qa
-        var addCommand = try Nimbus.Add.parse(["beta", "--qa"])
+        // First add a feature with --debuggable
+        var addCommand = try Nimbus.Add.parse(["beta", "--debuggable"])
         try addCommand.run()
 
         // Verify it was added

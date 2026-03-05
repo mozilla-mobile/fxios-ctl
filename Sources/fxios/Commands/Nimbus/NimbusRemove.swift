@@ -109,7 +109,7 @@ extension Nimbus {
                     )
 
                     if !result.wasPresent {
-                        reportSkipped("Feature not in QA settings (not added with --qa)")
+                        reportSkipped("Feature not in debuggable settings (not added with --debuggable)")
                     } else if result.removed {
                         reportSuccess("Removed debug setting")
                     } else {

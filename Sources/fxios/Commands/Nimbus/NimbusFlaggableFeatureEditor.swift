@@ -24,7 +24,7 @@ enum NimbusFlaggableFeatureEditor {
         // 1. Add enum case to NimbusFeatureFlagID
         content = try addEnumCase(name: name, to: content)
 
-        // 2. Add to debugKey if --qa
+        // 2. Add to debugKey if --debuggable
         if debug {
             content = try addToDebugKey(name: name, to: content)
         }
