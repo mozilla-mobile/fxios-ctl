@@ -61,7 +61,7 @@ extension Nimbus {
 
             // 3. Update NimbusFlaggableFeature.swift
             let flaggableFeaturePath = repo.root.appendingPathComponent(NimbusConstants.nimbusFlaggableFeaturePath)
-            Herald.declare("Updating NimbusFlaggableFeature.swift...")
+            Herald.declare("Updating FeatureFlagID.swift...")
             try NimbusFlaggableFeatureEditor.addFeature(
                 name: cleanName,
                 debug: debuggable,

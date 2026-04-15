@@ -103,7 +103,7 @@ enum NimbusFlaggableFeatureEditor {
         var lastCaseIndex: Int?
 
         for (index, line) in lines.enumerated() {
-            if line.contains("enum NimbusFeatureFlagID") {
+            if line.contains("enum FeatureFlagID") {
                 inEnum = true
                 continue
             }
