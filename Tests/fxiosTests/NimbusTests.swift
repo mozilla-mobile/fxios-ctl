@@ -44,9 +44,9 @@ struct NimbusTests {
         try FileManager.default.createDirectory(at: nimbusDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: debugDir, withIntermediateDirectories: true)
 
-        // Create NimbusFlaggableFeature.swift
+        // Create FeatureFlagID.swift
         let flaggableFeatureContent = """
-            enum NimbusFeatureFlagID: String, CaseIterable {
+            enum FeatureFlagID: String, CaseIterable {
                 case alpha
                 case zeta
 
@@ -75,14 +75,14 @@ struct NimbusTests {
                 }
             }
             """
-        let flaggableFeaturePath = featureFlagsDir.appendingPathComponent("NimbusFlaggableFeature.swift")
+        let flaggableFeaturePath = featureFlagsDir.appendingPathComponent("FeatureFlagID.swift")
         try flaggableFeatureContent.write(to: flaggableFeaturePath, atomically: true, encoding: .utf8)
 
         // Create NimbusFeatureFlagLayer.swift
         let flagLayerContent = """
             final class NimbusFeatureFlagLayer {
                 public func checkNimbusConfigFor(
-                    _ featureID: NimbusFeatureFlagID,
+                    _ featureID: FeatureFlagID,
                     from nimbus: FxNimbus = FxNimbus.shared
                 ) -> Bool {
                     switch featureID {
@@ -448,7 +448,7 @@ struct NimbusTests {
         #expect(content.contains("nimbus-features/newFeature.yaml"))
     }
 
-    @Test("add command updates NimbusFlaggableFeature.swift")
+    @Test("add command updates FeatureFlagID.swift")
     func addCommandUpdatesFlaggableFeature() throws {
         let repoDir = try createValidRepo()
         defer { cleanup(repoDir) }
@@ -462,7 +462,7 @@ struct NimbusTests {
         var command = try Nimbus.Add.parse(["beta"])
         try command.run()
 
-        let filePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/NimbusFlaggableFeature.swift")
+        let filePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/FeatureFlagID.swift")
         let content = try String(contentsOf: filePath, encoding: .utf8)
 
         // Should have added the enum case
@@ -510,8 +510,8 @@ struct NimbusTests {
         var command = try Nimbus.Add.parse(["beta", "--debuggable"])
         try command.run()
 
-        // Check NimbusFlaggableFeature.swift for debugKey
-        let flaggablePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/NimbusFlaggableFeature.swift")
+        // Check FeatureFlagID.swift for debugKey
+        let flaggablePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/FeatureFlagID.swift")
         let flaggableContent = try String(contentsOf: flaggablePath, encoding: .utf8)
         #expect(flaggableContent.contains(".beta"))
 
@@ -537,7 +537,7 @@ struct NimbusTests {
         var command = try Nimbus.Add.parse(["beta", "--user-toggleable"])
         try command.run()
 
-        let filePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/NimbusFlaggableFeature.swift")
+        let filePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/FeatureFlagID.swift")
         let content = try String(contentsOf: filePath, encoding: .utf8)
 
         #expect(content.contains("case .beta:"))
@@ -703,7 +703,7 @@ struct NimbusTests {
         try addCommand.run()
 
         // Verify it was added
-        let flaggablePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/NimbusFlaggableFeature.swift")
+        let flaggablePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/FeatureFlagID.swift")
         var content = try String(contentsOf: flaggablePath, encoding: .utf8)
         #expect(content.contains("case beta"))
 
@@ -711,7 +711,7 @@ struct NimbusTests {
         var removeCommand = try Nimbus.Remove.parse(["beta"])
         try removeCommand.run()
 
-        // Check NimbusFlaggableFeature.swift
+        // Check FeatureFlagID.swift
         content = try String(contentsOf: flaggablePath, encoding: .utf8)
         #expect(!content.contains("case beta"))
 
@@ -746,7 +746,7 @@ struct NimbusTests {
         try command.run()
 
         // Verify the Swift files weren't modified (feature didn't exist)
-        let flaggablePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/NimbusFlaggableFeature.swift")
+        let flaggablePath = repoDir.appendingPathComponent("firefox-ios/Client/FeatureFlags/FeatureFlagID.swift")
         let flaggableContent = try String(contentsOf: flaggablePath, encoding: .utf8)
         #expect(!flaggableContent.contains("nonexistent"))
     }

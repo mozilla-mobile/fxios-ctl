@@ -138,7 +138,7 @@ extension Nimbus {
 
         /// Removes the feature from NimbusFlaggableFeature.swift. Returns true if any failures occurred.
         private func removeFlaggableFeature(_ name: String, from path: URL) -> Bool {
-            Herald.declare("Updating NimbusFlaggableFeature.swift...")
+            Herald.declare("Updating FeatureFlagID.swift...")
             var hasFailures = false
 
             guard FileManager.default.fileExists(atPath: path.path) else {
