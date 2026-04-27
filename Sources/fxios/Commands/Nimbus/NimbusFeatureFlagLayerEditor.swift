@@ -87,7 +87,7 @@ enum NimbusFeatureFlagLayerEditor {
         let caseCode = """
 
                 case .\(name):
-                    return \(funcName)(from: nimbus)
+                    return \(funcName)()
         """
         lines.insert(caseCode, at: index)
 
@@ -145,8 +145,8 @@ enum NimbusFeatureFlagLayerEditor {
         let funcName = "check\(StringUtils.capitalizeFirst(name))Feature"
         let funcCode = """
 
-            private func \(funcName)(from nimbus: FxNimbus) -> Bool {
-                return nimbus.features.\(name).value().enabled
+            private func \(funcName)() -> Bool {
+                return nimbus.features.\(name)Feature.value().enabled
             }
         """
         lines.insert(funcCode, at: index)

@@ -165,11 +165,13 @@ extension Nimbus {
                     }
                 }
 
-                if result.featureKeyRemoved {
-                    reportSuccess("Removed from featureKey")
-                } else {
-                    reportFailure("Could not find/remove from featureKey")
-                    hasFailures = true
+                if let userPrefsKeyRemoved = result.userPrefsKeyRemoved {
+                    if userPrefsKeyRemoved {
+                        reportSuccess("Removed from userPrefsKey")
+                    } else {
+                        reportFailure("Found in userPrefsKey but could not remove")
+                        hasFailures = true
+                    }
                 }
             } catch {
                 reportFailure("Failed to process file: \(error.localizedDescription)")

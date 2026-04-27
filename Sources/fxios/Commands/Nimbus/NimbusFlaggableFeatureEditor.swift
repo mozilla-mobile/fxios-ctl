@@ -10,7 +10,7 @@ enum NimbusFlaggableFeatureEditor {
     struct RemovalResult {
         let enumCaseRemoved: Bool
         let debugKeyRemoved: Bool?  // nil = wasn't present, true = removed, false = failed to remove
-        let featureKeyRemoved: Bool
+        let userPrefsKeyRemoved: Bool?  // nil = wasn't present, true = removed, false = failed to remove
     }
 
     static func addFeature(
@@ -29,11 +29,9 @@ enum NimbusFlaggableFeatureEditor {
             content = try addToDebugKey(name: name, to: content)
         }
 
-        // 3. Add to featureKey
+        // 3. Add to userPrefsKey if user-toggleable
         if userToggleable {
-            content = try addUserToggleableCase(name: name, to: content)
-        } else {
-            content = try addToDefaultCase(name: name, to: content)
+            content = try addToUserPrefsKey(name: name, to: content)
         }
 
         try content.write(to: filePath, atomically: true, encoding: .utf8)
@@ -56,17 +54,13 @@ enum NimbusFlaggableFeatureEditor {
             debugKeyRemoved = removed
         }
 
-        // 3. Determine if user-toggleable and remove from featureKey
-        let userToggleable = isUserToggleable(name: name, content: originalContent)
-        let featureKeyRemoved: Bool
-        if userToggleable {
-            let (contentAfterFeature, removed) = removeUserToggleableCase(name: name, from: content)
-            content = contentAfterFeature
-            featureKeyRemoved = removed
-        } else {
-            let (contentAfterFeature, removed) = removeFromDefaultCase(name: name, from: content)
-            content = contentAfterFeature
-            featureKeyRemoved = removed
+        // 3. Check if in userPrefsKey and try to remove
+        let wasInUserPrefsKey = isInUserPrefsKey(name: name, content: originalContent)
+        var userPrefsKeyRemoved: Bool?
+        if wasInUserPrefsKey {
+            let (contentAfterPrefs, removed) = removeFromUserPrefsKey(name: name, from: content)
+            content = contentAfterPrefs
+            userPrefsKeyRemoved = removed
         }
 
         try content.write(to: filePath, atomically: true, encoding: .utf8)
@@ -74,7 +68,7 @@ enum NimbusFlaggableFeatureEditor {
         return RemovalResult(
             enumCaseRemoved: enumRemoved,
             debugKeyRemoved: debugKeyRemoved,
-            featureKeyRemoved: featureKeyRemoved
+            userPrefsKeyRemoved: userPrefsKeyRemoved
         )
     }
 
@@ -86,10 +80,25 @@ enum NimbusFlaggableFeatureEditor {
             content.contains("var debugKey: String?")
     }
 
-    private static func isUserToggleable(name: String, content: String) -> Bool {
-        // User-toggleable features have their own case in featureKey with fatalError or specific return
-        let userToggleablePattern = "case \\.\(name):\\s*\n\\s*(return FlagKeys\\.|fatalError)"
-        return content.range(of: userToggleablePattern, options: .regularExpression) != nil
+    private static func isInUserPrefsKey(name: String, content: String) -> Bool {
+        let lines = content.components(separatedBy: "\n")
+        var inUserPrefsKey = false
+        for line in lines {
+            if line.contains("var userPrefsKey: String?") {
+                inUserPrefsKey = true
+                continue
+            }
+            if inUserPrefsKey {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+                if trimmed == "default:" || trimmed == "}" {
+                    break
+                }
+                if trimmed.hasPrefix("case .\(name):") {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     // MARK: - Enum Case Operations
@@ -270,186 +279,73 @@ enum NimbusFlaggableFeatureEditor {
         return (content, false)
     }
 
-    // MARK: - featureKey Operations
+    // MARK: - userPrefsKey Operations
 
-    private static func addUserToggleableCase(name: String, to content: String) throws -> String {
+    private static func addToUserPrefsKey(name: String, to content: String) throws -> String {
         var lines = content.components(separatedBy: "\n")
 
-        // Find featureKey var and add a new case before the comment about non-toggleable cases
-        var inFeatureKey = false
+        var inUserPrefsKey = false
         var insertIndex: Int?
+        var lastCaseIndex: Int?
 
         for (index, line) in lines.enumerated() {
-            if line.contains("private var featureKey: String?") || line.contains("var featureKey: String?") {
-                inFeatureKey = true
+            if line.contains("var userPrefsKey: String?") {
+                inUserPrefsKey = true
                 continue
             }
 
-            if inFeatureKey {
-                // Insert before the comment about non-toggleable cases
-                if line.contains("Cases where users do not have the option") {
-                    insertIndex = index
+            if inUserPrefsKey {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+                if trimmed.hasPrefix("case .") {
+                    let caseName = String(trimmed.dropFirst(6).prefix(while: { $0.isLetter || $0.isNumber }))
+                    lastCaseIndex = index
+
+                    if caseName > name && insertIndex == nil {
+                        insertIndex = index
+                    }
+                }
+
+                if trimmed == "default:" {
+                    if insertIndex == nil {
+                        insertIndex = lastCaseIndex.map { $0 + 1 } ?? index
+                    }
                     break
                 }
             }
         }
 
         guard let index = insertIndex else {
-            throw ValidationError("Could not find insertion point for featureKey user-toggleable case")
+            throw ValidationError("Could not find insertion point in userPrefsKey")
         }
 
-        let caseCode = """
-                case .\(name):
-                    fatalError("Please implement a key for this feature")
-        """
-        lines.insert(caseCode, at: index)
+        let newCase = "        case .\(name): fatalError(\"Please implement a preference key for this feature\")"
+        lines.insert(newCase, at: index)
 
         return lines.joined(separator: "\n")
     }
 
-    private static func removeUserToggleableCase(name: String, from content: String) -> (String, Bool) {
+    private static func removeFromUserPrefsKey(name: String, from content: String) -> (String, Bool) {
         var lines = content.components(separatedBy: "\n")
 
-        // Find and remove the case block
-        var removeStart: Int?
-        var removeEnd: Int?
+        var inUserPrefsKey = false
 
-        for (index, line) in lines.enumerated()
-            where line.trimmingCharacters(in: .whitespaces) == "case .\(name):" {
-            removeStart = index
-            // Find the end of this case (next case or default)
-            for i in (index + 1)..<lines.count {
-                let nextLine = lines[i].trimmingCharacters(in: .whitespaces)
-                if nextLine.hasPrefix("case ") || nextLine.hasPrefix("//") {
-                    removeEnd = i
+        for (index, line) in lines.enumerated() {
+            if line.contains("var userPrefsKey: String?") {
+                inUserPrefsKey = true
+                continue
+            }
+
+            if inUserPrefsKey {
+                let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+                if trimmed.hasPrefix("case .\(name):") {
+                    lines.remove(at: index)
+                    return (lines.joined(separator: "\n"), true)
+                }
+
+                if trimmed == "default:" || trimmed == "}" {
                     break
-                }
-            }
-            break
-        }
-
-        if let start = removeStart, let end = removeEnd {
-            lines.removeSubrange(start..<end)
-            return (lines.joined(separator: "\n"), true)
-        }
-
-        return (content, false)
-    }
-
-    private static func addToDefaultCase(name: String, to content: String) throws -> String {
-        var lines = content.components(separatedBy: "\n")
-
-        // Find the default case in featureKey (the one with return nil)
-        var inFeatureKey = false
-        var inDefaultCase = false
-        var insertIndex: Int?
-
-        for (index, line) in lines.enumerated() {
-            if line.contains("private var featureKey: String?") || line.contains("var featureKey: String?") {
-                inFeatureKey = true
-                continue
-            }
-
-            if inFeatureKey {
-                if line.contains("Cases where users do not have the option") {
-                    inDefaultCase = true
-                    continue
-                }
-
-                if inDefaultCase {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-                    if trimmed.hasPrefix(".") {
-                        let featureName = String(trimmed.dropFirst().prefix(while: { $0.isLetter || $0.isNumber }))
-
-                        if featureName > name && insertIndex == nil {
-                            insertIndex = index
-                        }
-                    }
-
-                    // End of the case list (return nil)
-                    if trimmed.hasPrefix("return nil") {
-                        if insertIndex == nil {
-                            // Insert before the last .feature: line
-                            for i in stride(from: index - 1, through: 0, by: -1) {
-                                let prevLine = lines[i].trimmingCharacters(in: .whitespaces)
-                                if prevLine.hasPrefix(".") && prevLine.hasSuffix(":") {
-                                    // Change : to , and insert after
-                                    lines[i] = lines[i].replacingOccurrences(of: ":", with: ",")
-                                    insertIndex = i + 1
-                                    break
-                                }
-                            }
-                        }
-                        break
-                    }
-                }
-            }
-        }
-
-        guard let index = insertIndex else {
-            throw ValidationError("Could not find insertion point for featureKey default case")
-        }
-
-        // Determine suffix
-        let nextLine = lines[index].trimmingCharacters(in: .whitespaces)
-        let suffix = nextLine.hasPrefix("return") ? ":" : ","
-
-        lines.insert("                .\(name)\(suffix)", at: index)
-
-        // If we inserted with :, change the next line's : to ,
-        if suffix == ":" {
-            let nextIdx = index + 1
-            if nextIdx < lines.count && lines[nextIdx].contains(":") {
-                let trimmedNext = lines[nextIdx].trimmingCharacters(in: .whitespaces)
-                if trimmedNext.hasPrefix(".") && trimmedNext.hasSuffix(":") {
-                    lines[nextIdx] = lines[nextIdx].replacingOccurrences(of: ":", with: ",")
-                }
-            }
-        }
-
-        return lines.joined(separator: "\n")
-    }
-
-    private static func removeFromDefaultCase(name: String, from content: String) -> (String, Bool) {
-        var lines = content.components(separatedBy: "\n")
-
-        var inFeatureKey = false
-        var inDefaultCase = false
-
-        for (index, line) in lines.enumerated() {
-            if line.contains("private var featureKey: String?") || line.contains("var featureKey: String?") {
-                inFeatureKey = true
-                continue
-            }
-
-            if inFeatureKey {
-                if line.contains("Cases where users do not have the option") {
-                    inDefaultCase = true
-                    continue
-                }
-
-                if inDefaultCase {
-                    let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-                    if trimmed == ".\(name)," || trimmed == ".\(name):" {
-                        // If this was the last entry, make previous entry end with :
-                        if trimmed.hasSuffix(":") {
-                            for i in stride(from: index - 1, through: 0, by: -1) {
-                                let prevLine = lines[i].trimmingCharacters(in: .whitespaces)
-                                if prevLine.hasPrefix(".") && prevLine.hasSuffix(",") {
-                                    lines[i] = lines[i].replacingOccurrences(of: ",", with: ":")
-                                    break
-                                }
-                            }
-                        }
-                        lines.remove(at: index)
-                        return (lines.joined(separator: "\n"), true)
-                    }
-
-                    if trimmed.hasPrefix("return nil") {
-                        break
-                    }
                 }
             }
         }

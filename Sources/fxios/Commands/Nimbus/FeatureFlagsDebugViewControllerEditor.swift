@@ -24,7 +24,7 @@ enum FeatureFlagsDebugViewControllerEditor {
         var lastSettingEndIndex: Int?
 
         for (index, line) in lines.enumerated() {
-            if line.contains("var children: [Setting]") {
+            if line.contains("children: [Setting]") {
                 inChildren = true
                 continue
             }

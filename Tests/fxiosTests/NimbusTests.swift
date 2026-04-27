@@ -50,26 +50,21 @@ struct NimbusTests {
                 case alpha
                 case zeta
 
+                var userPrefsKey: String? {
+                    typealias FlagKeys = PrefsKeys.FeatureFlags
+
+                    switch self {
+                    case .alpha: return FlagKeys.Alpha
+                    default: return nil
+                    }
+                }
+
                 var debugKey: String? {
                     switch self {
                     case    .alpha,
                             .zeta:
                         return rawValue + PrefsKeys.FeatureFlags.DebugSuffixKey
                     default:
-                        return nil
-                    }
-                }
-            }
-
-            struct NimbusFlaggableFeature {
-                private var featureKey: String? {
-                    typealias FlagKeys = PrefsKeys.FeatureFlags
-
-                    switch featureID {
-                    case .alpha:
-                        return FlagKeys.Alpha
-                    // Cases where users do not have the option to manipulate a setting.
-                    case .zeta:
                         return nil
                     }
                 }
@@ -81,25 +76,24 @@ struct NimbusTests {
         // Create NimbusFeatureFlagLayer.swift
         let flagLayerContent = """
             final class NimbusFeatureFlagLayer {
-                public func checkNimbusConfigFor(
-                    _ featureID: FeatureFlagID,
-                    from nimbus: FxNimbus = FxNimbus.shared
-                ) -> Bool {
+                private let nimbus: FxNimbus
+
+                public func checkNimbusConfigFor(_ featureID: FeatureFlagID) -> Bool {
                     switch featureID {
                     case .alpha:
-                        return checkAlphaFeature(from: nimbus)
+                        return checkAlphaFeature()
 
                     case .zeta:
-                        return checkZetaFeature(from: nimbus)
+                        return checkZetaFeature()
                     }
                 }
 
-                private func checkAlphaFeature(from nimbus: FxNimbus) -> Bool {
-                    return nimbus.features.alpha.value().enabled
+                private func checkAlphaFeature() -> Bool {
+                    return nimbus.features.alphaFeature.value().enabled
                 }
 
-                private func checkZetaFeature(from nimbus: FxNimbus) -> Bool {
-                    return nimbus.features.zeta.value().enabled
+                private func checkZetaFeature() -> Bool {
+                    return nimbus.features.zetaFeature.value().enabled
                 }
             }
             """
@@ -110,7 +104,7 @@ struct NimbusTests {
         let debugVCContent = """
             final class FeatureFlagsDebugViewController {
                 private func generateFeatureFlagToggleSettings() -> SettingSection {
-                    var children: [Setting] =  [
+                    let children: [Setting] =  [
                         FeatureFlagsBoolSetting(
                             with: .alpha,
                             titleText: format(string: "Alpha"),
@@ -467,8 +461,6 @@ struct NimbusTests {
 
         // Should have added the enum case
         #expect(content.contains("case beta"))
-        // Should have added to the default case in featureKey (since no --user-toggleable)
-        #expect(content.contains(".beta"))
     }
 
     @Test("add command updates NimbusFeatureFlagLayer.swift")
@@ -490,10 +482,10 @@ struct NimbusTests {
 
         // Should have added the switch case
         #expect(content.contains("case .beta:"))
-        #expect(content.contains("checkBetaFeature(from: nimbus)"))
+        #expect(content.contains("checkBetaFeature()"))
         // Should have added the check function
-        #expect(content.contains("private func checkBetaFeature(from nimbus: FxNimbus) -> Bool"))
-        #expect(content.contains("nimbus.features.beta.value().enabled"))
+        #expect(content.contains("private func checkBetaFeature() -> Bool"))
+        #expect(content.contains("nimbus.features.betaFeature.value().enabled"))
     }
 
     @Test("add command with --debuggable updates debuggable settings")
@@ -541,7 +533,7 @@ struct NimbusTests {
         let content = try String(contentsOf: filePath, encoding: .utf8)
 
         #expect(content.contains("case .beta:"))
-        #expect(content.contains("fatalError(\"Please implement a key for this feature\")"))
+        #expect(content.contains("fatalError(\"Please implement a preference key for this feature\")"))
     }
 
     @Test("add command with --description adds description to template")
