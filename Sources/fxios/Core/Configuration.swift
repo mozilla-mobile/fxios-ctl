@@ -6,7 +6,7 @@ import Foundation
 
 enum Configuration {
     static let name = "fxios"
-    static let version = "20260415.0"
+    static let version = "20260427.0"
     static let shortDescription = "A helper CLI for the firefox-ios repository"
     static let markerFileName = ".fxios.yaml"
 
