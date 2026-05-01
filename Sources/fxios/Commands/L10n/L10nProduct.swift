@@ -40,8 +40,8 @@ enum L10nProduct: String, ExpressibleByArgument, CaseIterable {
     /// Relative path from repo root to .xcodeproj
     var projectPath: String {
         switch self {
-        case .firefox: return "Client.xcodeproj"
-        case .focus: return "Blockzilla.xcodeproj"
+        case .firefox: return "firefox-ios/Client.xcodeproj"
+        case .focus: return "focus-ios/Blockzilla.xcodeproj"
         }
     }
 

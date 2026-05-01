@@ -59,9 +59,9 @@ struct L10nProductTests {
             #expect(L10nProduct.firefox.projectName == "Client.xcodeproj")
         }
 
-        @Test("Firefox projectPath is Client.xcodeproj")
+        @Test("Firefox projectPath is firefox-ios/Client.xcodeproj")
         func firefoxProjectPath() {
-            #expect(L10nProduct.firefox.projectPath == "Client.xcodeproj")
+            #expect(L10nProduct.firefox.projectPath == "firefox-ios/Client.xcodeproj")
         }
 
         @Test("Firefox skipWidgetKit is false")
@@ -95,14 +95,32 @@ struct L10nProductTests {
             #expect(L10nProduct.focus.projectName == "Blockzilla.xcodeproj")
         }
 
-        @Test("Focus projectPath is Blockzilla.xcodeproj")
+        @Test("Focus projectPath is focus-ios/Blockzilla.xcodeproj")
         func focusProjectPath() {
-            #expect(L10nProduct.focus.projectPath == "Blockzilla.xcodeproj")
+            #expect(L10nProduct.focus.projectPath == "focus-ios/Blockzilla.xcodeproj")
         }
 
         @Test("Focus skipWidgetKit is true")
         func focusSkipWidgetKit() {
             #expect(L10nProduct.focus.skipWidgetKit == true)
+        }
+    }
+
+    // MARK: - BuildProduct Parity
+
+    /// L10nProduct.projectPath must match BuildProduct.projectPath for the same product,
+    /// since both resolve against the same repo root. Drift caused issue #23.
+    @Suite("BuildProduct Parity")
+    struct BuildProductParityTests {
+
+        @Test("Firefox projectPath matches BuildProduct.firefox")
+        func firefoxProjectPathMatchesBuildProduct() {
+            #expect(L10nProduct.firefox.projectPath == BuildProduct.firefox.projectPath)
+        }
+
+        @Test("Focus projectPath matches BuildProduct.focus")
+        func focusProjectPathMatchesBuildProduct() {
+            #expect(L10nProduct.focus.projectPath == BuildProduct.focus.projectPath)
         }
     }
 
