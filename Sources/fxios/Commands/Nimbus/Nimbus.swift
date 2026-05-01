@@ -22,6 +22,9 @@ struct Nimbus: ParsableCommand {
 
 // MARK: - Constants
 
+// These paths are firefox-ios repo conventions, not values we discover at runtime. The Nimbus
+// subcommands (add/remove/refresh) all touch this same set of files in lockstep, so if firefox-ios
+// ever reorganizes the FeatureFlags or Nimbus directories these constants must be updated together.
 enum NimbusConstants {
     static let nimbusFmlPath = "firefox-ios/nimbus.fml.yaml"
     static let nimbusFeaturesPath = "firefox-ios/nimbus-features"
