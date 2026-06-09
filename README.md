@@ -31,6 +31,7 @@ If a command doesn't materially achieve one of these goals & the bonus goal, it 
 
 ```bash
 brew tap mozilla-mobile/fxios
+brew trust mozilla-mobile/fxios
 brew install fxios
 ```
 
