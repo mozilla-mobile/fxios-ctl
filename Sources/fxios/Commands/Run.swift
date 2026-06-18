@@ -61,6 +61,14 @@ struct Run: ParsableCommand {
     @Option(name: .long, help: "Custom derived data path.")
     var derivedData: String?
 
+    @Flag(
+        name: [.customLong("doNotSkipMacroValidation"), .customLong("do-not-skip-macro-validation")],
+        help: "Do not pass -skipMacroValidation to xcodebuild."
+    )
+    var doNotSkipMacroValidation = false
+
+    var skipMacroValidation: Bool { !doNotSkipMacroValidation }
+
     // MARK: - Workflow Options
 
     @Flag(name: .long, help: "Skip resolving Swift Package dependencies.")
@@ -183,7 +191,8 @@ struct Run: ParsableCommand {
             scheme: product.scheme,
             configuration: config,
             simulator: simulator,
-            derivedDataPath: derivedData
+            derivedDataPath: derivedData,
+            skipMacroValidation: skipMacroValidation
         )
 
         // Add build action
@@ -274,7 +283,8 @@ struct Run: ParsableCommand {
             scheme: product.scheme,
             configuration: config,
             simulator: simulator,
-            derivedDataPath: derivedData
+            derivedDataPath: derivedData,
+            skipMacroValidation: skipMacroValidation
         )
         buildArgs.append("build")
 

@@ -61,6 +61,14 @@ struct Test: ParsableCommand {
     @Option(name: .long, help: "Custom derived data path.")
     var derivedData: String?
 
+    @Flag(
+        name: [.customLong("doNotSkipMacroValidation"), .customLong("do-not-skip-macro-validation")],
+        help: "Do not pass -skipMacroValidation to xcodebuild."
+    )
+    var doNotSkipMacroValidation = false
+
+    var skipMacroValidation: Bool { !doNotSkipMacroValidation }
+
     // MARK: - Test Options
 
     @Option(name: .long, help: "Maximum test retries on failure (default: 0).")
@@ -161,7 +169,8 @@ struct Test: ParsableCommand {
             scheme: product.scheme,
             configuration: product.testingConfiguration,
             simulator: simulator,
-            derivedDataPath: derivedData
+            derivedDataPath: derivedData,
+            skipMacroValidation: skipMacroValidation
         )
         args.append("build-for-testing")
 
@@ -191,7 +200,8 @@ struct Test: ParsableCommand {
             scheme: product.scheme,
             configuration: product.testingConfiguration,
             simulator: simulator,
-            derivedDataPath: derivedData
+            derivedDataPath: derivedData,
+            skipMacroValidation: skipMacroValidation
         )
 
         // Add test plan if available
@@ -232,7 +242,8 @@ struct Test: ParsableCommand {
                 scheme: product.scheme,
                 configuration: product.testingConfiguration,
                 simulator: simulator,
-                derivedDataPath: derivedData
+                derivedDataPath: derivedData,
+                skipMacroValidation: skipMacroValidation
             )
             buildArgs.append("build-for-testing")
 
@@ -247,7 +258,8 @@ struct Test: ParsableCommand {
             scheme: product.scheme,
             configuration: product.testingConfiguration,
             simulator: simulator,
-            derivedDataPath: derivedData
+            derivedDataPath: derivedData,
+            skipMacroValidation: skipMacroValidation
         )
 
         // Add test plan if available

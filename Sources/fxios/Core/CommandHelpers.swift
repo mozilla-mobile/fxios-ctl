@@ -255,7 +255,8 @@ enum CommandHelpers {
         scheme: String,
         configuration: String,
         simulator: SimulatorSelection,
-        derivedDataPath: String?
+        derivedDataPath: String?,
+        skipMacroValidation: Bool = true
     ) -> [String] {
         var args: [String] = []
 
@@ -274,6 +275,10 @@ enum CommandHelpers {
             args += ["-derivedDataPath", derivedData]
         }
 
+        if skipMacroValidation {
+            args += ["-skipMacroValidation"]
+        }
+
         // Common build settings
         args += ["COMPILER_INDEX_STORE_ENABLE=NO"]
 
@@ -290,7 +295,8 @@ enum CommandHelpers {
         projectPath: URL,
         scheme: String,
         configuration: String,
-        derivedDataPath: String?
+        derivedDataPath: String?,
+        skipMacroValidation: Bool = true
     ) -> [String] {
         var args: [String] = []
 
@@ -306,6 +312,10 @@ enum CommandHelpers {
         // Derived data path
         if let derivedData = derivedDataPath {
             args += ["-derivedDataPath", derivedData]
+        }
+
+        if skipMacroValidation {
+            args += ["-skipMacroValidation"]
         }
 
         // Common build settings

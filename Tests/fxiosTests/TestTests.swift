@@ -224,6 +224,13 @@ struct TestCommandTests {
         #expect(command.derivedData == "/tmp/DD")
     }
 
+    @Test("Can parse doNotSkipMacroValidation flag")
+    func parseDoNotSkipMacroValidation() throws {
+        let command = try Test.parse(["--doNotSkipMacroValidation"])
+        #expect(command.doNotSkipMacroValidation == true)
+        #expect(command.skipMacroValidation == false)
+    }
+
     @Test("Can parse retries option")
     func parseRetries() throws {
         let command = try Test.parse(["--retries", "3"])
@@ -258,6 +265,8 @@ struct TestCommandTests {
         #expect(command.os == nil)
         #expect(command.buildFirst == false)
         #expect(command.derivedData == nil)
+        #expect(command.doNotSkipMacroValidation == false)
+        #expect(command.skipMacroValidation == true)
         #expect(command.retries == 0)
         #expect(command.quiet == false)
         #expect(command.expose == false)
