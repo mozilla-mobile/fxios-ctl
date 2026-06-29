@@ -67,6 +67,13 @@ struct RunTests {
         #expect(command.derivedData == "/tmp/DD")
     }
 
+    @Test("Can parse doNotSkipMacroValidation flag")
+    func parseDoNotSkipMacroValidation() throws {
+        let command = try Run.parse(["--doNotSkipMacroValidation"])
+        #expect(command.doNotSkipMacroValidation == true)
+        #expect(command.skipMacroValidation == false)
+    }
+
     @Test("Can parse skip-resolve flag")
     func parseSkipResolve() throws {
         let command = try Run.parse(["--skip-resolve"])
@@ -105,6 +112,8 @@ struct RunTests {
         #expect(command.os == nil)
         #expect(command.configuration == nil)
         #expect(command.derivedData == nil)
+        #expect(command.doNotSkipMacroValidation == false)
+        #expect(command.skipMacroValidation == true)
         #expect(command.skipResolve == false)
         #expect(command.clean == false)
         #expect(command.quiet == false)

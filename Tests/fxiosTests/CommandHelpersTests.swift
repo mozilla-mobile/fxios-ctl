@@ -264,6 +264,39 @@ struct CommandHelpersTests {
         #expect(args.contains("COMPILER_INDEX_STORE_ENABLE=NO"))
     }
 
+    @Test("buildXcodebuildArgs skips macro validation by default")
+    func buildArgsSkipMacroValidationByDefault() {
+        let projectPath = URL(fileURLWithPath: "/path/to/Client.xcodeproj")
+        let simulator = createMockSimulatorSelection()
+
+        let args = CommandHelpers.buildXcodebuildArgs(
+            projectPath: projectPath,
+            scheme: "Fennec",
+            configuration: "Fennec",
+            simulator: simulator,
+            derivedDataPath: nil
+        )
+
+        #expect(args.contains("-skipMacroValidation"))
+    }
+
+    @Test("buildXcodebuildArgs can omit macro validation skip")
+    func buildArgsCanOmitMacroValidationSkip() {
+        let projectPath = URL(fileURLWithPath: "/path/to/Client.xcodeproj")
+        let simulator = createMockSimulatorSelection()
+
+        let args = CommandHelpers.buildXcodebuildArgs(
+            projectPath: projectPath,
+            scheme: "Fennec",
+            configuration: "Fennec",
+            simulator: simulator,
+            derivedDataPath: nil,
+            skipMacroValidation: false
+        )
+
+        #expect(!args.contains("-skipMacroValidation"))
+    }
+
     // MARK: - buildXcodebuildArgsForDevice Tests
 
     @Test("buildXcodebuildArgsForDevice includes project path")
@@ -355,6 +388,35 @@ struct CommandHelpersTests {
 
         #expect(args.contains("-derivedDataPath"))
         #expect(args.contains("/tmp/DerivedData"))
+    }
+
+    @Test("buildXcodebuildArgsForDevice skips macro validation by default")
+    func buildDeviceArgsSkipMacroValidationByDefault() {
+        let projectPath = URL(fileURLWithPath: "/path/to/Client.xcodeproj")
+
+        let args = CommandHelpers.buildXcodebuildArgsForDevice(
+            projectPath: projectPath,
+            scheme: "Fennec",
+            configuration: "Fennec",
+            derivedDataPath: nil
+        )
+
+        #expect(args.contains("-skipMacroValidation"))
+    }
+
+    @Test("buildXcodebuildArgsForDevice can omit macro validation skip")
+    func buildDeviceArgsCanOmitMacroValidationSkip() {
+        let projectPath = URL(fileURLWithPath: "/path/to/Client.xcodeproj")
+
+        let args = CommandHelpers.buildXcodebuildArgsForDevice(
+            projectPath: projectPath,
+            scheme: "Fennec",
+            configuration: "Fennec",
+            derivedDataPath: nil,
+            skipMacroValidation: false
+        )
+
+        #expect(!args.contains("-skipMacroValidation"))
     }
 
     // MARK: - ListSims Command Tests
