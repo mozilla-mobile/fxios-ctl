@@ -264,29 +264,3 @@ struct BootstrapTests {
     }
 }
 
-// MARK: - Fixtures
-
-private func makeDirectory(at root: URL, path: String) throws -> URL {
-    let url = root.appendingPathComponent(path)
-    try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-    return url
-}
-
-@discardableResult
-private func makeFile(at directory: URL, named name: String) throws -> URL {
-    let url = directory.appendingPathComponent(name)
-    try "".write(to: url, atomically: true, encoding: .utf8)
-    return url
-}
-
-private func exists(_ url: URL) -> Bool {
-    FileManager.default.fileExists(atPath: url.path)
-}
-
-/// Writes an executable stand-in for the repository's scripts/install-swiftlint.sh.
-private func makeInstallSwiftlintScript(in repoRoot: URL, body: String) throws {
-    let scripts = try makeDirectory(at: repoRoot, path: "scripts")
-    let script = scripts.appendingPathComponent("install-swiftlint.sh")
-    try "#!/bin/sh\n\(body)\n".write(to: script, atomically: true, encoding: .utf8)
-    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
-}

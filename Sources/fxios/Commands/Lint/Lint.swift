@@ -15,7 +15,10 @@ enum LintError: Error, CustomStringConvertible {
     var description: String {
         switch self {
         case .swiftlintNotFound:
-            return "swiftlint not found. Install it with 'brew install swiftlint'."
+            // firefox-ios pins SwiftLint and its CONTRIBUTING.md asks contributors not
+            // to install it through Homebrew, so bootstrap is the recommended route.
+            return "swiftlint not found. Run 'fxios bootstrap' to install the version "
+                + "pinned in .swiftlint-version."
         case .lintFailed(let exitCode):
             return "Linting failed with exit code \(exitCode)."
         case .noChangedFiles:

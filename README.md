@@ -261,7 +261,9 @@ Checks performed:
 
 - **Required tools**: git, node, npm, swift, xcodebuild, xcode-select, simctl
 - **Optional tools**: swiftlint (reports status but won't flag as issue if missing)
-- **Repository context** (when run from firefox-ios): validates `.fxios.yaml`, checks git hooks installation, shows configured defaults
+- **Repository context** (when run from firefox-ios): validates `.fxios.yaml`, checks git hooks installation, checks the pinned SwiftLint is installed, shows configured defaults
+
+A missing pinned SwiftLint is reported as an issue: the Xcode build phases only print a warning when it is absent, so builds look clean while linting nothing. If a different SwiftLint version is also on `PATH`, doctor notes the mismatch.
 
 #### `l10n`
 
@@ -288,7 +290,11 @@ These commands handle locale code mapping between Xcode and Pontoon formats, fil
 
 #### `lint`
 
-Runs SwiftLint on the codebase. By default, lints only files changed compared to the main branch.
+Runs SwiftLint on the codebase. `lint run` lints everything by default; pass `--changed` to lint only Swift files changed compared to the main branch. `lint fix` fixes everything by default and also takes `--changed`.
+
+SwiftLint is resolved from the version the repository pins in `.swiftlint-version`, installing it via `scripts/install-swiftlint.sh` if needed. That is the same binary the Xcode build phases, the pre-push hook and CI use, so results agree with them. Checkouts predating the pin fall back to a SwiftLint on `PATH`.
+
+No `--config` is passed, matching CI and the build phases: firefox-ios keeps nested `.swiftlint.yml` files under `focus-ios` and `BrowserKit/Tests`, and SwiftLint only applies them when left to discover configuration itself.
 
 #### `nimbus`
 

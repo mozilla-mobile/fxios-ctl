@@ -13,15 +13,18 @@ extension Lint {
         )
 
         mutating func run() throws {
-            try LintHelpers.requireSwiftlint()
+            // Info is useful outside a checkout, so the repo is optional here; without
+            // one there is no pin to read and the PATH install is reported instead.
+            let repoRoot = (try? RepoDetector.requireValidRepo())?.root
+            let swiftlint = try LintHelpers.resolveSwiftlint(repoRoot: repoRoot)
 
             Herald.declare("SwiftLint Version:", isNewCommand: true)
-            try ShellRunner.run("swiftlint", arguments: ["version"])
+            try ShellRunner.run(swiftlint, arguments: ["version"])
 
             Herald.declare("")
 
             Herald.declare("Available Rules:")
-            try ShellRunner.run("swiftlint", arguments: ["rules"])
+            try ShellRunner.run(swiftlint, arguments: ["rules"])
         }
     }
 }

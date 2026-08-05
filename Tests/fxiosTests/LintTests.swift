@@ -177,6 +177,14 @@ struct LintTests {
         #expect(error.description.contains("swiftlint not found"))
     }
 
+    @Test("LintError.swiftlintNotFound points at bootstrap, not Homebrew")
+    func swiftlintNotFoundRecommendsBootstrap() {
+        // firefox-ios CONTRIBUTING.md asks contributors not to brew install SwiftLint.
+        let error = LintError.swiftlintNotFound
+        #expect(error.description.contains("fxios bootstrap"))
+        #expect(!error.description.lowercased().contains("brew"))
+    }
+
     @Test("LintError.lintFailed has correct description")
     func lintFailedError() {
         let error = LintError.lintFailed(exitCode: 1)
@@ -189,4 +197,165 @@ struct LintTests {
         let error = LintError.noChangedFiles
         #expect(error.description.contains("No changed"))
     }
+
+    // MARK: - Invocation Building Tests
+
+    @Test("lintArguments uses the lint subcommand")
+    func lintArgumentsUsesLintSubcommand() {
+        #expect(LintHelpers.lintArguments() == ["lint"])
+    }
+
+    @Test("lintArguments never passes --config")
+    func lintArgumentsOmitsConfig() {
+        // firefox-ios has nested .swiftlint.yml files under focus-ios and
+        // BrowserKit/Tests; an explicit --config would suppress them, and neither
+        // the Xcode build phases nor CI pass one.
+        let args = LintHelpers.lintArguments(flags: ["--strict"], files: ["/repo/A.swift"])
+        #expect(!args.contains("--config"))
+        #expect(!args.contains { $0.hasSuffix(".swiftlint.yml") || $0.hasSuffix(".swiftlint.yaml") })
+    }
+
+    @Test("lintArguments never passes --path")
+    func lintArgumentsOmitsPath() {
+        // SwiftLint removed --path; files are positional.
+        let args = LintHelpers.lintArguments(files: ["/repo/A.swift", "/repo/B.swift"])
+        #expect(!args.contains("--path"))
+    }
+
+    @Test("lintArguments passes every file in one invocation")
+    func lintArgumentsBatchesFiles() {
+        let files = ["/repo/A.swift", "/repo/B.swift", "/repo/C.swift"]
+        let args = LintHelpers.lintArguments(files: files)
+        #expect(args == ["lint"] + files)
+    }
+
+    @Test("lintArguments orders flags before files")
+    func lintArgumentsOrdersFlagsBeforeFiles() {
+        let args = LintHelpers.lintArguments(flags: ["--strict", "--quiet"], files: ["/repo/A.swift"])
+        #expect(args == ["lint", "--strict", "--quiet", "/repo/A.swift"])
+    }
+
+    @Test("lintArguments includes --fix when fixing")
+    func lintArgumentsIncludesFix() {
+        let args = LintHelpers.lintArguments(fix: true, files: ["/repo/A.swift"])
+        #expect(args == ["lint", "--fix", "/repo/A.swift"])
+    }
+
+    @Test("lintArguments omits --fix when linting")
+    func lintArgumentsOmitsFix() {
+        #expect(!LintHelpers.lintArguments(files: ["/repo/A.swift"]).contains("--fix"))
+    }
+
+    // MARK: - SwiftLint Resolution Tests
+
+    @Test("hasInstallScript detects the pinned installer")
+    func hasInstallScriptDetectsInstaller() throws {
+        try withTemporaryDirectory { tempDir in
+            #expect(!LintHelpers.hasInstallScript(repoRoot: tempDir))
+
+            try makeInstallSwiftlintScript(in: tempDir, body: "exit 0")
+
+            #expect(LintHelpers.hasInstallScript(repoRoot: tempDir))
+        }
+    }
+
+    @Test("pinnedSwiftlintPath returns the already-installed binary")
+    func pinnedSwiftlintPathUsesPathOnly() throws {
+        try withTemporaryDirectory { tempDir in
+            // --path-only succeeds when .tools already holds the pinned version.
+            try makeInstallSwiftlintScript(in: tempDir, body: "echo /repo/.tools/swiftlint/0.65.0/swiftlint")
+
+            let resolved = LintHelpers.pinnedSwiftlintPath(repoRoot: tempDir)
+
+            #expect(resolved == "/repo/.tools/swiftlint/0.65.0/swiftlint")
+        }
+    }
+
+    @Test("pinnedSwiftlintPath installs when the binary is missing")
+    func pinnedSwiftlintPathInstallsWhenMissing() throws {
+        try withTemporaryDirectory { tempDir in
+            // --path-only exits 1 without downloading; a bare run installs and prints.
+            try makeInstallSwiftlintScript(in: tempDir, body: """
+                if [ "$1" = "--path-only" ]; then exit 1; fi
+                echo "Installing SwiftLint 0.65.0." >&2
+                echo /repo/.tools/swiftlint/0.65.0/swiftlint
+                """)
+
+            let resolved = LintHelpers.pinnedSwiftlintPath(repoRoot: tempDir)
+
+            #expect(resolved == "/repo/.tools/swiftlint/0.65.0/swiftlint")
+        }
+    }
+
+    @Test("pinnedSwiftlintPath ignores progress output on stderr")
+    func pinnedSwiftlintPathIgnoresStderr() throws {
+        try withTemporaryDirectory { tempDir in
+            try makeInstallSwiftlintScript(in: tempDir, body: """
+                echo "SwiftLint 0.65.0 already installed." >&2
+                echo /repo/.tools/swiftlint/0.65.0/swiftlint
+                """)
+
+            #expect(LintHelpers.pinnedSwiftlintPath(repoRoot: tempDir)
+                == "/repo/.tools/swiftlint/0.65.0/swiftlint")
+        }
+    }
+
+    @Test("pinnedSwiftlintPath returns nil when the installer fails")
+    func pinnedSwiftlintPathReturnsNilOnFailure() throws {
+        try withTemporaryDirectory { tempDir in
+            // A checksum mismatch or a network failure exits non-zero both times.
+            try makeInstallSwiftlintScript(in: tempDir, body: "echo 'checksum mismatch' >&2\nexit 1")
+
+            #expect(LintHelpers.pinnedSwiftlintPath(repoRoot: tempDir) == nil)
+        }
+    }
+
+    @Test("pinnedSwiftlintPath returns nil when the installer prints nothing")
+    func pinnedSwiftlintPathReturnsNilOnEmptyOutput() throws {
+        try withTemporaryDirectory { tempDir in
+            try makeInstallSwiftlintScript(in: tempDir, body: "exit 0")
+
+            #expect(LintHelpers.pinnedSwiftlintPath(repoRoot: tempDir) == nil)
+        }
+    }
+
+    @Test("resolveSwiftlint prefers the pinned binary over PATH")
+    func resolveSwiftlintPrefersPinned() throws {
+        try withTemporaryDirectory { tempDir in
+            try makeInstallSwiftlintScript(in: tempDir, body: "echo /repo/.tools/swiftlint/0.65.0/swiftlint")
+
+            let resolved = try LintHelpers.resolveSwiftlint(repoRoot: tempDir)
+
+            #expect(resolved == "/repo/.tools/swiftlint/0.65.0/swiftlint")
+        }
+    }
+
+    @Test(
+        "resolveSwiftlint falls back to PATH without an installer",
+        .enabled(if: pathSwiftlintAvailable, "requires swiftlint on PATH")
+    )
+    func resolveSwiftlintFallsBackToPath() throws {
+        // Checkouts predating the pin have no installer, so PATH is all there is.
+        try withTemporaryDirectory { tempDir in
+            let resolved = try LintHelpers.resolveSwiftlint(repoRoot: tempDir)
+            #expect(resolved == "swiftlint")
+        }
+    }
+
+    @Test(
+        "resolveSwiftlint throws when no SwiftLint can be found",
+        .disabled(if: pathSwiftlintAvailable, "swiftlint on PATH would satisfy the fallback")
+    )
+    func resolveSwiftlintThrowsWhenUnavailable() throws {
+        try withTemporaryDirectory { tempDir in
+            #expect(throws: LintError.self) {
+                _ = try LintHelpers.resolveSwiftlint(repoRoot: tempDir)
+            }
+        }
+    }
 }
+
+/// Whether SwiftLint is on PATH. The fallback branch of `resolveSwiftlint` can only
+/// be exercised one way or the other depending on the machine running the suite.
+private let pathSwiftlintAvailable =
+    (try? ShellRunner.runAndCapture("which", arguments: ["swiftlint"])) != nil

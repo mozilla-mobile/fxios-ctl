@@ -139,6 +139,9 @@ struct Doctor: ParsableCommand {
             // Check git hooks
             checkGitHooks(repoRoot: repo.root, issues: &issues)
 
+            // Check the SwiftLint version the repository pins
+            checkPinnedSwiftlint(repoRoot: repo.root, issues: &issues)
+
             // Display merged configuration (defaults are always present)
             printCheck(passed: true, tool: "default build", detail: repo.config.defaultBuildProduct)
             printCheck(passed: true, tool: "default bootstrap", detail: repo.config.defaultBootstrap)
@@ -186,7 +189,59 @@ struct Doctor: ParsableCommand {
         }
     }
 
+    /// Reports on the SwiftLint version pinned in `.swiftlint-version`.
+    ///
+    /// When it is missing, the Xcode build phases fall back to only printing a warning,
+    /// so a build looks clean while linting nothing. That is worth flagging as an issue.
+    /// A PATH install on a different version is only a note: `fxios lint` prefers the
+    /// pinned binary, so the two disagreeing is confusing rather than broken.
+    private func checkPinnedSwiftlint(repoRoot: URL, issues: inout [String]) {
+        guard LintHelpers.hasInstallScript(repoRoot: repoRoot) else {
+            printCheck(passed: true, tool: "pinned swiftlint", detail: "not used by this checkout")
+            return
+        }
+
+        let script = repoRoot.appendingPathComponent(LintHelpers.installScriptPath).path
+        let resolved = try? ShellRunner.runAndCapture(
+            script,
+            arguments: ["--path-only"],
+            workingDirectory: repoRoot
+        )
+
+        guard let binary = resolved?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !binary.isEmpty else {
+            printCheck(passed: false, tool: "pinned swiftlint", detail: "not installed")
+            issues.append("Pinned SwiftLint not installed (run: fxios bootstrap)")
+            return
+        }
+
+        let pinnedVersion = firstLine(of: getToolVersion(binary, arguments: ["version"]))
+        printCheck(passed: true, tool: "pinned swiftlint", detail: pinnedVersion ?? binary)
+
+        guard let pinnedVersion,
+              let pathVersion = firstLine(of: getToolVersion("swiftlint", arguments: ["version"])),
+              pathVersion != pinnedVersion else { return }
+
+        Herald.declare(
+            "Note: swiftlint \(pathVersion) is on your PATH but this repository pins "
+                + "\(pinnedVersion). fxios lint uses the pinned one.",
+            asError: true
+        )
+    }
+
     // MARK: - Helpers
+
+    private func firstLine(of result: Result<String, Error>) -> String? {
+        guard case .success(let output) = result else { return nil }
+
+        let line = output
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespaces)
+
+        return (line?.isEmpty ?? true) ? nil : line
+    }
 
     private func getToolVersion(_ tool: String, arguments: [String]) -> Result<String, Error> {
         let process = Process()
