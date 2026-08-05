@@ -261,9 +261,11 @@ Checks performed:
 
 - **Required tools**: git, node, npm, swift, xcodebuild, xcode-select, simctl
 - **Optional tools**: swiftlint (reports status but won't flag as issue if missing)
-- **Repository context** (when run from firefox-ios): validates `.fxios.yaml`, checks git hooks installation, checks the pinned SwiftLint is installed, shows configured defaults
+- **Repository context** (when run from firefox-ios): validates `.fxios.yaml`, checks git hooks, checks the pinned SwiftLint is installed, shows configured defaults
 
-A missing pinned SwiftLint is reported as an issue: the Xcode build phases only print a warning when it is absent, so builds look clean while linting nothing. If a different SwiftLint version is also on `PATH`, doctor notes the mismatch.
+Git hooks are checked for contents, not just presence. Bootstrap copies `.githooks` into `.git/hooks` rather than symlinking, so pulling a change to a hook leaves the installed copy on the old revision; doctor reports those as `out of date` and re-running bootstrap fixes them.
+
+A missing pinned SwiftLint is reported as an issue: the Xcode build phases only print a warning when it is absent, so builds look clean while linting nothing. If a different SwiftLint version is also on `PATH`, doctor notes the mismatch — the `swiftlint (PATH)` and `pinned swiftlint` rows show both.
 
 #### `l10n`
 
