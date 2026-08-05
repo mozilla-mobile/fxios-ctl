@@ -32,17 +32,17 @@ extension Lint {
 
         mutating func run() throws {
             let repo = try RepoDetector.requireValidRepo()
-            try LintHelpers.requireSwiftlint()
+            let swiftlint = try LintHelpers.resolveSwiftlint(repoRoot: repo.root)
 
             // Default is all (unless --changed is specified)
             let lintAll = !changed
 
             if expose {
-                printExposedCommands(lintAll: lintAll, repoRoot: repo.root)
+                printExposedCommands(lintAll: lintAll, repoRoot: repo.root, swiftlint: swiftlint)
                 return
             }
 
-            try runLint(lintAll: lintAll, repoRoot: repo.root)
+            try runLint(lintAll: lintAll, repoRoot: repo.root, swiftlint: swiftlint)
         }
 
         // MARK: - Flags
@@ -57,23 +57,12 @@ extension Lint {
 
         // MARK: - Lint
 
-        private func runLint(lintAll: Bool, repoRoot: URL) throws {
+        private func runLint(lintAll: Bool, repoRoot: URL, swiftlint: String) throws {
+            let arguments: [String]
+
             if lintAll {
                 Herald.declare("Linting entire codebase...", isNewCommand: true)
-
-                do {
-                    try ShellRunner.run("swiftlint", arguments: swiftlintFlags(), workingDirectory: repoRoot)
-                    Herald.declare("Linting complete!", asConclusion: true)
-                } catch let error as ShellRunnerError {
-                    if case .commandFailed(_, let exitCode) = error {
-                        if strict {
-                            throw LintError.lintFailed(exitCode: exitCode)
-                        }
-                        Herald.declare("Linting found violations (exit code \(exitCode))", asError: true, asConclusion: true)
-                    } else {
-                        throw error
-                    }
-                }
+                arguments = LintHelpers.lintArguments(flags: swiftlintFlags())
             } else {
                 Herald.declare("Linting changed files...", isNewCommand: true)
                 let changedFiles = try LintHelpers.getChangedSwiftFiles(repoRoot: repoRoot)
@@ -84,45 +73,30 @@ extension Lint {
                 }
 
                 Herald.declare("Found \(changedFiles.count) changed file(s)")
+                arguments = LintHelpers.lintArguments(flags: swiftlintFlags(), files: changedFiles)
+            }
 
-                let configPath = repoRoot.appendingPathComponent(".swiftlint.yaml").path
+            do {
+                try ShellRunner.run(swiftlint, arguments: arguments, workingDirectory: repoRoot)
+                Herald.declare("Linting complete!", asConclusion: true)
+            } catch let error as ShellRunnerError {
+                guard case .commandFailed(_, let exitCode) = error else { throw error }
 
-                var hasViolations = false
-                for file in changedFiles {
-                    var args: [String] = ["lint", "--config", configPath, "--path", file]
-                    args.append(contentsOf: swiftlintFlags())
-
-                    do {
-                        try ShellRunner.run("swiftlint", arguments: args, workingDirectory: repoRoot)
-                    } catch let error as ShellRunnerError {
-                        if case .commandFailed(_, let exitCode) = error {
-                            hasViolations = true
-                            if strict {
-                                throw LintError.lintFailed(exitCode: exitCode)
-                            }
-                        } else {
-                            throw error
-                        }
-                    }
+                if strict {
+                    throw LintError.lintFailed(exitCode: exitCode)
                 }
-
-                if hasViolations {
-                    Herald.declare("Linting found violations", asError: true, asConclusion: true)
-                } else {
-                    Herald.declare("Linting complete!", asConclusion: true)
-                }
+                Herald.declare("Linting found violations (exit code \(exitCode))", asError: true, asConclusion: true)
             }
         }
 
         // MARK: - Expose Command
 
-        private func printExposedCommands(lintAll: Bool, repoRoot: URL) {
+        private func printExposedCommands(lintAll: Bool, repoRoot: URL, swiftlint: String) {
             if lintAll {
                 Herald.raw("# Lint entire codebase")
-                Herald.raw(CommandHelpers.formatCommand("swiftlint", arguments: swiftlintFlags()))
+                let args = LintHelpers.lintArguments(flags: swiftlintFlags())
+                Herald.raw(CommandHelpers.formatCommand(swiftlint, arguments: args))
             } else {
-                let configPath = repoRoot.appendingPathComponent(".swiftlint.yaml").path
-
                 Herald.raw("# Get merge base")
                 Herald.raw("BASE=$(git merge-base HEAD main)")
                 Herald.raw("")
@@ -131,11 +105,10 @@ extension Lint {
                 Herald.raw(CommandHelpers.formatCommand("git", arguments: gitArgs))
                 Herald.raw("")
 
-                var args: [String] = ["lint", "--config", configPath, "--path", "<file>"]
-                args.append(contentsOf: swiftlintFlags())
+                let args = LintHelpers.lintArguments(flags: swiftlintFlags(), files: ["<files>"])
 
-                Herald.raw("# Lint each changed file")
-                Herald.raw(CommandHelpers.formatCommand("swiftlint", arguments: args))
+                Herald.raw("# Lint the changed files")
+                Herald.raw(CommandHelpers.formatCommand(swiftlint, arguments: args))
             }
         }
     }

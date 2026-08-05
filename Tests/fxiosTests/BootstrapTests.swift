@@ -23,6 +23,7 @@ struct BootstrapTests {
         #expect(!discussion.isEmpty)
         #expect(discussion.contains("Firefox"))
         #expect(discussion.contains("Focus"))
+        #expect(discussion.contains(".swiftlint-version"))
     }
 
     // MARK: - Product Enum Tests
@@ -127,4 +128,139 @@ struct BootstrapTests {
         let config = try RepoDetector.loadConfig(from: markerPath)
         #expect(config.defaultBootstrap == nil)
     }
+
+    // MARK: - Virtual Environment Cleanup Tests
+
+    @Test("deleteVenvFolders removes .venv at the repository root")
+    func deleteVenvAtRoot() throws {
+        try withTemporaryDirectory { tempDir in
+            let venv = try makeDirectory(at: tempDir, path: ".venv")
+            try makeFile(at: venv, named: "pyvenv.cfg")
+
+            try Bootstrap.deleteVenvFolders(in: tempDir)
+
+            #expect(!exists(venv))
+        }
+    }
+
+    @Test("deleteVenvFolders removes nested .venv directories")
+    func deleteNestedVenvs() throws {
+        try withTemporaryDirectory { tempDir in
+            let shallow = try makeDirectory(at: tempDir, path: "firefox-ios/.venv")
+            let deep = try makeDirectory(at: tempDir, path: "a/b/c/.venv")
+            try makeFile(at: deep, named: "pyvenv.cfg")
+
+            try Bootstrap.deleteVenvFolders(in: tempDir)
+
+            #expect(!exists(shallow))
+            #expect(!exists(deep))
+            // Only the .venv directories go; their parents stay.
+            #expect(exists(tempDir.appendingPathComponent("a/b/c")))
+        }
+    }
+
+    @Test("deleteVenvFolders leaves other hidden directories alone")
+    func deleteVenvKeepsOtherHiddenDirs() throws {
+        try withTemporaryDirectory { tempDir in
+            let hidden = try makeDirectory(at: tempDir, path: ".githooks")
+            let venv = try makeDirectory(at: tempDir, path: ".venv")
+
+            try Bootstrap.deleteVenvFolders(in: tempDir)
+
+            #expect(!exists(venv))
+            #expect(exists(hidden))
+        }
+    }
+
+    @Test("deleteVenvFolders ignores a file named .venv")
+    func deleteVenvIgnoresFiles() throws {
+        try withTemporaryDirectory { tempDir in
+            // bootstrap.sh matches with `find -type d`, so a plain file survives.
+            try makeFile(at: tempDir, named: ".venv")
+
+            try Bootstrap.deleteVenvFolders(in: tempDir)
+
+            #expect(exists(tempDir.appendingPathComponent(".venv")))
+        }
+    }
+
+    @Test("deleteVenvFolders does not descend into pruned directories")
+    func deleteVenvPrunesHeavyDirectories() throws {
+        try withTemporaryDirectory { tempDir in
+            var pruned: [URL] = []
+            for name in Bootstrap.venvSearchPruneList {
+                pruned.append(try makeDirectory(at: tempDir, path: "\(name)/.venv"))
+            }
+            let real = try makeDirectory(at: tempDir, path: ".venv")
+
+            try Bootstrap.deleteVenvFolders(in: tempDir)
+
+            #expect(!exists(real))
+            for url in pruned {
+                #expect(exists(url))
+            }
+        }
+    }
+
+    @Test("deleteVenvFolders succeeds when there is nothing to remove")
+    func deleteVenvWithNoMatches() throws {
+        try withTemporaryDirectory { tempDir in
+            try makeFile(at: tempDir, named: "README.md")
+
+            try Bootstrap.deleteVenvFolders(in: tempDir)
+
+            #expect(exists(tempDir.appendingPathComponent("README.md")))
+        }
+    }
+
+    // MARK: - Pinned SwiftLint Tests
+
+    @Test("installPinnedSwiftlint runs the repository script")
+    func installPinnedSwiftlintRunsScript() throws {
+        try withTemporaryDirectory { tempDir in
+            try makeInstallSwiftlintScript(in: tempDir, body: "touch \"$(dirname \"$0\")/../ran\"")
+
+            Bootstrap.installPinnedSwiftlint(repoRoot: tempDir)
+
+            #expect(exists(tempDir.appendingPathComponent("ran")))
+        }
+    }
+
+    @Test("installPinnedSwiftlint runs the script from the repository root")
+    func installPinnedSwiftlintUsesRepoRootAsWorkingDirectory() throws {
+        try withTemporaryDirectory { tempDir in
+            // bootstrap.sh invokes the script as ./scripts/install-swiftlint.sh,
+            // so it always resolves relative paths against the repo root.
+            try makeInstallSwiftlintScript(in: tempDir, body: "pwd > cwd.txt")
+
+            Bootstrap.installPinnedSwiftlint(repoRoot: tempDir)
+
+            let recorded = try String(contentsOf: tempDir.appendingPathComponent("cwd.txt"), encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            #expect(URL(fileURLWithPath: recorded).resolvingSymlinksInPath()
+                == tempDir.resolvingSymlinksInPath())
+        }
+    }
+
+    @Test("installPinnedSwiftlint skips checkouts without the script")
+    func installPinnedSwiftlintSkipsWhenScriptMissing() throws {
+        try withTemporaryDirectory { tempDir in
+            // Branches predating the pin have no scripts/install-swiftlint.sh.
+            Bootstrap.installPinnedSwiftlint(repoRoot: tempDir)
+
+            #expect(!exists(tempDir.appendingPathComponent("scripts")))
+        }
+    }
+
+    @Test("installPinnedSwiftlint tolerates a failing script")
+    func installPinnedSwiftlintToleratesFailure() throws {
+        try withTemporaryDirectory { tempDir in
+            // bootstrap.sh has no `set -e`, so a checksum mismatch or a network
+            // failure warns and lets the rest of the bootstrap continue.
+            try makeInstallSwiftlintScript(in: tempDir, body: "echo 'checksum mismatch' >&2\nexit 1")
+
+            Bootstrap.installPinnedSwiftlint(repoRoot: tempDir)
+        }
+    }
 }
+

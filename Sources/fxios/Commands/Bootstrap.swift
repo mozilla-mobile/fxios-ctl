@@ -12,6 +12,9 @@ struct Bootstrap: ParsableCommand {
             By default, bootstraps the product specified in .fxios.yaml (default_bootstrap),
             or Firefox if not configured. Use -p to override, or --all to bootstrap both.
 
+            For either product, bootstrap will first install the SwiftLint version
+            pinned in .swiftlint-version.
+
             For Firefox (-p firefox), bootstrap will:
               • Remove .venv directories
               • Download and run Nimbus FML bootstrap script
@@ -47,6 +50,10 @@ struct Bootstrap: ParsableCommand {
         try ToolChecker.requireNode()
         try ToolChecker.requireNpm()
 
+        // Mirrors the install-swiftlint.sh call at the top of bootstrap.sh, which
+        // runs ahead of the product branch and so applies to both products.
+        Bootstrap.installPinnedSwiftlint(repoRoot: repo.root)
+
         if all {
             try bootstrapFirefox(repoRoot: repo.root)
             try bootstrapFocus(repoRoot: repo.root)
@@ -79,7 +86,7 @@ struct Bootstrap: ParsableCommand {
 
         // Delete all .venv folders
         Herald.declare("Cleaning up virtual environments...")
-        try deleteVenvFolders(in: repoRoot)
+        try Bootstrap.deleteVenvFolders(in: repoRoot)
 
         // Download and run nimbus-fml bootstrap script
         Herald.declare("Setting up Nimbus FML...")
@@ -155,20 +162,69 @@ struct Bootstrap: ParsableCommand {
         Herald.declare("Focus bootstrap complete!")
     }
 
-    private func deleteVenvFolders(in directory: URL) throws {
+    // MARK: - SwiftLint
+
+    /// Installs the SwiftLint version pinned in `.swiftlint-version`, matching the
+    /// `./scripts/install-swiftlint.sh` call at the top of `bootstrap.sh`.
+    ///
+    /// Checkouts from before the script was added (older branches, release branches)
+    /// are skipped rather than treated as an error, and a failed install only warns:
+    /// `bootstrap.sh` does not set `-e`, so a download failure there leaves the rest
+    /// of the bootstrap running too.
+    static func installPinnedSwiftlint(repoRoot: URL) {
+        let script = repoRoot.appendingPathComponent("scripts/install-swiftlint.sh")
+
+        guard FileManager.default.fileExists(atPath: script.path) else {
+            Herald.declare(
+                "No scripts/install-swiftlint.sh in this checkout, skipping pinned SwiftLint.",
+                isNewCommand: true
+            )
+            return
+        }
+
+        Herald.declare("Installing pinned SwiftLint...", isNewCommand: true)
+
+        do {
+            try ShellRunner.run(script.path, workingDirectory: repoRoot)
+        } catch {
+            Herald.declare(
+                "Could not install the pinned SwiftLint version. Continuing; "
+                    + "run scripts/install-swiftlint.sh to retry.",
+                asError: true
+            )
+        }
+    }
+
+    // MARK: - Virtual Environments
+
+    /// Directories that are never worth descending into when looking for `.venv`.
+    /// `bootstrap.sh` lets `find` walk these, but they hold tens of thousands of
+    /// files and cannot contain a Python virtual environment.
+    static let venvSearchPruneList: Set<String> = [".git", "node_modules"]
+
+    /// Removes every `.venv` directory under `directory`, matching
+    /// `find . -type d -name ".venv" -exec rm -rf {} +` in `bootstrap.sh`.
+    static func deleteVenvFolders(in directory: URL) throws {
         let fileManager = FileManager.default
+
+        // Hidden files must not be skipped here: `.venv` is itself a dotfile, so
+        // `.skipsHiddenFiles` would filter out every directory we are looking for.
         let enumerator = fileManager.enumerator(
             at: directory,
-            includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            includingPropertiesForKeys: [.isDirectoryKey]
         )
 
         var venvDirs: [URL] = []
 
         while let url = enumerator?.nextObject() as? URL {
-            let resourceValues = try url.resourceValues(forKeys: [.isDirectoryKey])
-            if resourceValues.isDirectory == true && url.lastPathComponent == ".venv" {
+            // A dangling symlink has no resource values; it is never a .venv either.
+            guard let resourceValues = try? url.resourceValues(forKeys: [.isDirectoryKey]),
+                  resourceValues.isDirectory == true else { continue }
+
+            if url.lastPathComponent == ".venv" {
                 venvDirs.append(url)
+                enumerator?.skipDescendants()
+            } else if venvSearchPruneList.contains(url.lastPathComponent) {
                 enumerator?.skipDescendants()
             }
         }

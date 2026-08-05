@@ -239,6 +239,8 @@ Debug output goes to stderr and includes timestamps, file locations, and underly
 
 Bootstraps the repository for development. By default, bootstraps the product specified in `.fxios.yaml` (`default_bootstrap`), or Firefox if not configured.
 
+Regardless of product, bootstrap first installs the SwiftLint version pinned in the repository's `.swiftlint-version` by running `scripts/install-swiftlint.sh`. This is what the Xcode build phases and the pre-push hook lint with, so it keeps local runs on the same version as CI. Checkouts that predate the pin have no such script and are skipped.
+
 #### `build`
 
 Builds Firefox, Focus, or Klar for development using xcodebuild. By default, builds the product specified in `.fxios.yaml` (`default_build_product`), or Firefox if not configured.
@@ -259,7 +261,11 @@ Checks performed:
 
 - **Required tools**: git, node, npm, swift, xcodebuild, xcode-select, simctl
 - **Optional tools**: swiftlint (reports status but won't flag as issue if missing)
-- **Repository context** (when run from firefox-ios): validates `.fxios.yaml`, checks git hooks installation, shows configured defaults
+- **Repository context** (when run from firefox-ios): validates `.fxios.yaml`, checks git hooks, checks the pinned SwiftLint is installed, shows configured defaults
+
+Git hooks are checked for contents, not just presence. Bootstrap copies `.githooks` into `.git/hooks` rather than symlinking, so pulling a change to a hook leaves the installed copy on the old revision; doctor reports those as `out of date` and re-running bootstrap fixes them.
+
+A missing pinned SwiftLint is reported as an issue: the Xcode build phases only print a warning when it is absent, so builds look clean while linting nothing. If a different SwiftLint version is also on `PATH`, doctor notes the mismatch — the `swiftlint (PATH)` and `pinned swiftlint` rows show both.
 
 #### `l10n`
 
@@ -286,7 +292,11 @@ These commands handle locale code mapping between Xcode and Pontoon formats, fil
 
 #### `lint`
 
-Runs SwiftLint on the codebase. By default, lints only files changed compared to the main branch.
+Runs SwiftLint on the codebase. `lint run` lints everything by default; pass `--changed` to lint only Swift files changed compared to the main branch. `lint fix` fixes everything by default and also takes `--changed`.
+
+SwiftLint is resolved from the version the repository pins in `.swiftlint-version`, installing it via `scripts/install-swiftlint.sh` if needed. That is the same binary the Xcode build phases, the pre-push hook and CI use, so results agree with them. Checkouts predating the pin fall back to a SwiftLint on `PATH`.
+
+No `--config` is passed, matching CI and the build phases: firefox-ios keeps nested `.swiftlint.yml` files under `focus-ios` and `BrowserKit/Tests`, and SwiftLint only applies them when left to discover configuration itself.
 
 #### `nimbus`
 
