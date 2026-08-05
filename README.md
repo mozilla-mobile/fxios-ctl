@@ -239,6 +239,8 @@ Debug output goes to stderr and includes timestamps, file locations, and underly
 
 Bootstraps the repository for development. By default, bootstraps the product specified in `.fxios.yaml` (`default_bootstrap`), or Firefox if not configured.
 
+Regardless of product, bootstrap first installs the SwiftLint version pinned in the repository's `.swiftlint-version` by running `scripts/install-swiftlint.sh`. This is what the Xcode build phases and the pre-push hook lint with, so it keeps local runs on the same version as CI. Checkouts that predate the pin have no such script and are skipped.
+
 #### `build`
 
 Builds Firefox, Focus, or Klar for development using xcodebuild. By default, builds the product specified in `.fxios.yaml` (`default_build_product`), or Firefox if not configured.
