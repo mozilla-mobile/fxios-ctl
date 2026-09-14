@@ -30,8 +30,8 @@ If a command doesn't materially achieve one of these goals & the bonus goal, it 
 `fxios` is available through brew.
 
 ```bash
-brew tap mozilla-mobile/fxios
 brew trust mozilla-mobile/fxios
+brew tap mozilla-mobile/fxios
 brew install fxios
 ```
 
